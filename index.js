@@ -33,6 +33,7 @@ let tempDuration = traveldurations[0];
 
 const PARALLEL = 8;
 
+// https://www.aviasales.ru/search/LED0107YVR15071
 
 destinations.forEach((d) => {
   const [airportStart, airportDestination] = d.split('-');
@@ -46,7 +47,7 @@ destinations.forEach((d) => {
 
       requests.push({
         code: `${airportStart}-${airportDestination} ${startTempMoment.format('DD-MM-YYYY')} - ${tempBackMoment.format('DD-MM-YYYY')}`,
-        url: `https://travel.tinkoff.ru/#/avia/results/${airportStart}${startTempMoment.format('DDMMYYYY')}${airportDestination}~${airportDestination}${tempBackMoment.format('DDMMYYYY')}${airportStart}~100-E`,
+        url: `https://www.aviasales.ru/search/${airportStart}${startTempMoment.format('DDMM')}${airportDestination}${tempBackMoment.format('DDMM')}1`,
       });
 
 
@@ -78,17 +79,26 @@ puppeteer.launch()
                     })
                     .then((page) => {
                       page
-                          .waitForSelector('button[class="ak-Button ak-Button--primary ak-Button--block"]', {timeout: 90000})
+                          .waitForSelector('div[class="prediction__advice --unknown"]', {timeout: 90000})
+                          .then(() => {
+                            return page.waitFor(1000);
+                          })
+                          .then((el) => {
+                            return el.click('div[class="filters__item filter --stopover"]');
+                          })
+                          .then(() => {
+                            return page.click('label[for="stopover-0-1_AMS"]');
+                          })
                           .then(() => {
                             return page.waitFor(1000);
                           })
                           .then(() => {
-                            return page.$eval('.ak-Price__Value', e => e.innerHTML);
+                            return page.$eval('span[class="price --rub"]', e => e.innerHTML);
                           })
                           .then((valueStr) => {
                             const price = parseInt(valueStr.replace(/\s/g, '',));
 
-                            if (price < MAX_PRICE) {
+                            if (true || price < MAX_PRICE) {
                               results.push({
                                 price,
                                 code: request.code,
