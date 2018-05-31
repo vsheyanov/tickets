@@ -4,8 +4,8 @@ const _ = require('lodash');
 
 
 const startSearchDate = '01-09-2018';
-const endSearchDate = '31-10-2018';
-const traveldurations = [13, 17];
+const endSearchDate = '10-09-2018';
+const traveldurations = [13, 16];
 const MAX_PRICE = 50000;
 
 // YVR - vancouver
@@ -13,13 +13,13 @@ const MAX_PRICE = 50000;
 
 
 const destinations = [
-    // 'HEL-AKL',
-    // 'TLL-AKL',
-    // 'LED-AKL',
-    'HEL-YVR',
-    'TLL-YVR',
-    'LED-YVR',
+  'HEL-YYC',
+  'TLL-YYC',
+  'LED-YYC',
+  'MOW-YYC',
 ];
+
+const excludedConnections = ['LHR', 'LGWLHR', 'EWR', 'SFO', 'SEA', 'LAX', 'JFK', 'ORD'];
 
 // https://travel.tinkoff.ru/#/avia/results/HEL01022018AKL~AKL16022018HEL~100-E
 
@@ -31,7 +31,7 @@ const endMoment = moment(endSearchDate, 'DD-MM-YYYY');
 
 let tempDuration = traveldurations[0];
 
-const PARALLEL = 8;
+const PARALLEL = 7;
 
 // https://www.aviasales.ru/search/LED0107YVR15071
 
@@ -44,12 +44,10 @@ destinations.forEach((d) => {
     while (true) {
       const tempBackMoment = startTempMoment.clone().add(tempDuration, 'day');
 
-
       requests.push({
         code: `${airportStart}-${airportDestination} ${startTempMoment.format('DD-MM-YYYY')} - ${tempBackMoment.format('DD-MM-YYYY')}`,
         url: `https://www.aviasales.ru/search/${airportStart}${startTempMoment.format('DDMM')}${airportDestination}${tempBackMoment.format('DDMM')}1`,
       });
-
 
       tempDuration++;
       if (tempDuration > traveldurations[traveldurations.length - 1]) {
@@ -78,22 +76,63 @@ puppeteer.launch()
                       return browser.newPage();
                     })
                     .then((page) => {
-                      page
-                          .waitForSelector('div[class="prediction__advice --unknown"]', {timeout: 90000})
+                      return page.setViewport({ width: 1300, height: 1000 })
                           .then(() => {
-                            return page.waitFor(1000);
+                            return page;
                           })
-                          .then((el) => {
-                            return el.click('div[class="filters__item filter --stopover"]');
+                          .catch((error) => {
+                            console.log('cannot set viewport', error);
+                            return page;
+                          });
+                    })
+                    .then((page) => {
+                      page.waitForSelector('div.prediction__advice', { timeout: 90000 })
+
+                          .then(() => {
+                            return page.waitFor(500);
                           })
                           .then(() => {
-                            return page.click('label[for="stopover-0-1_AMS"]');
+                            return page.click('div.filters__item.filter.--stopover div');
                           })
                           .then(() => {
-                            return page.waitFor(1000);
+                            return page.waitFor(500);
                           })
                           .then(() => {
-                            return page.$eval('span[class="price --rub"]', e => e.innerHTML);
+                            let elements = [];
+                            for (var first = 0; first < 2; first++) {
+                              for (var second = 0; second < 2; second++) {
+                                elements.push(...excludedConnections.map(c => {
+                                  return `label[for="stopover-${first}-${second}_${c}"]`;
+                                }));
+                              }
+                            }
+                            const uncheck = () => {
+                              if (elements.length === 0) {
+                                return Promise.resolve();
+                              } else {
+                                const c = elements[0];
+                                elements.splice(0, 1);
+                                return page.$(c)
+                                    .then((el) => {
+                                      if (el) {
+                                        return el.click()
+                                            .then(() => { return uncheck(); });
+                                      } else {
+                                        return uncheck();
+                                      }
+                                    });
+                              }
+                            };
+                            return uncheck();
+                          })
+                          .then(() => {
+                            return page.waitFor(500);
+                          })
+                          // .then(() => {
+                          //   return page.screenshot({ path: `./screens/screen-${Date.now()}.jpg`, fullPage: true });
+                          // })
+                          .then(() => {
+                            return page.$eval('div.app__content span[class="price --rub"]', e => e.innerHTML);
                           })
                           .then((valueStr) => {
                             const price = parseInt(valueStr.replace(/\s/g, '',));
@@ -103,24 +142,27 @@ puppeteer.launch()
                                 price,
                                 code: request.code,
                               });
-                              console.log(`Found price ${price} for ${request.code}`)
+                              console.log(`Found price ${price} for ${request.code}, ${request.url}`);
                             }
-
                             return page.close();
                           })
                           .then(() => {
                             resolve();
                           })
                           .catch((error) => {
-                            console.log(`error in ${request.code}`);
+                            console.log(`error in ${request.code}`, error);
 
                             requests.unshift(request);
 
                             return page.close()
                                 .then(() => { resolve(); });
                           });
-
                       return page.goto(request.url);
+                    })
+                    .catch((error) => {
+                      console.log('cannot create page');
+                      requests.unshift(request);
+                      resolve();
                     });
               });
             }))
@@ -136,10 +178,11 @@ puppeteer.launch()
                 sorted.forEach((result) => {
                   console.log(`${result.price} - ${result.code}`)
                 });
-
               }
             });
       }
-
       iterate();
+    })
+    .catch((error) => {
+      console.log('cannot start browser');
     });
