@@ -137,7 +137,7 @@ puppeteer.launch()
                           .then((valueStr) => {
                             const price = parseInt(valueStr.replace(/\s/g, '',));
 
-                            if (true || price < MAX_PRICE) {
+                            if (price < MAX_PRICE) {
                               results.push({
                                 price,
                                 code: request.code,
