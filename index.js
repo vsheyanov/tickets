@@ -4,7 +4,7 @@ const _ = require('lodash');
 
 
 const startSearchDate = '01-09-2018';
-const endSearchDate = '10-09-2018';
+const endSearchDate = '30-09-2018';
 const traveldurations = [13, 16];
 const MAX_PRICE = 50000;
 
@@ -31,7 +31,8 @@ const endMoment = moment(endSearchDate, 'DD-MM-YYYY');
 
 let tempDuration = traveldurations[0];
 
-const PARALLEL = 7;
+const requestsPerMinute = 1.5;
+const PARALLEL = 5;
 
 // https://www.aviasales.ru/search/LED0107YVR15071
 
@@ -60,7 +61,7 @@ destinations.forEach((d) => {
   }
 });
 
-console.log(`${requests.length} requests, approx ${requests.length / 3 / PARALLEL} minutes`);
+console.log(`${requests.length} requests, approx ${requests.length / requestsPerMinute / PARALLEL} minutes`);
 
 puppeteer.launch()
     .then((browser) => {
